@@ -1,11 +1,20 @@
-use std::{fs, error::Error};
+use std::{fs, error::Error, result};
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents: String = fs::read_to_string(config.filename)?;
 
-    for line in search(&config.query, &contents){
+    
+    
+    let results = if config.case_sensitive {
+        search(&config.query, &contents)
+    } else {
+        search_case_insensitive(&config.query, &contents)
+    };
+    
+    for line in results {
         println!("{}", line);
     }
+
 
     Ok(())
 }
@@ -20,9 +29,24 @@ pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str>{
 
     results
 }
+
+pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str>{
+    
+    let query: String = query.to_lowercase();
+    let mut results: Vec<&str> = Vec::new();
+    
+    contents.lines().for_each(|line: &str| {
+        if line.to_lowercase().contains(&query) {
+            results.push(line);
+        }
+    });
+
+    results
+}
 pub struct Config {
     pub query: String,
     pub filename: String,
+    pub case_sensitive: bool,
 }
 
 impl Config {
@@ -31,10 +55,11 @@ impl Config {
             return Err("not enough arguments");
         }
 
-        let query = args[1].clone();
-        let filename = args[2].clone();
+        let query: String = args[1].clone();
+        let filename: String = args[2].clone();
+        let case_sensitive: bool = false;
 
-        return Ok(Config { query, filename});
+        return Ok(Config { query, filename, case_sensitive});
     }
 }
 
@@ -50,5 +75,27 @@ Rust:
 safe, productive, fast.
 Pick Three.";
         assert_eq!(vec!["safe, productive, fast."], search(query, contents));
+    }
+
+    #[test]
+    fn test_case_sensitive() {
+        let query = "duct";
+        let contents = "\
+Rust:
+safe, productive, fast.
+Pick Three.
+Duct Tape";
+        assert_eq!(vec!["safe, productive, fast."], search(query, contents));
+    }
+
+    #[test]
+    fn test_case_insensitive() {
+        let query = "rUsT";
+        let contents = "\
+Rust:
+safe, productive, fast.
+Pick Three.
+Trust me.";
+        assert_eq!(vec!["Rust:", "Trust me."], search_case_insensitive(query, contents));
     }
 }
